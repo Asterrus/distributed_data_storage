@@ -18,7 +18,7 @@ def get_database_url() -> str:
     return f"postgresql+psycopg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
 
 
-def create_engine(url: str, is_echo: bool = True) -> AsyncEngine:
+def create_engine(url: str, is_echo: bool = False) -> AsyncEngine:
     return create_async_engine(
         url,
         echo=is_echo,

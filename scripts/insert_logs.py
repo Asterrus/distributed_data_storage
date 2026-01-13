@@ -1,8 +1,10 @@
+from collections.abc import Sequence
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-async def insert_logs(engine: AsyncEngine, logs):
+async def insert_logs(engine: AsyncEngine, logs: Sequence):
     query = text("""
         INSERT INTO web_logs (
             timestamp,
