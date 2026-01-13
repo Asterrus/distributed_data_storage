@@ -11,35 +11,10 @@ from db.engine import create_engine, get_database_url
 load_dotenv()
 
 
-# @pytest.fixture(scope="session")
-# def db_init_script_path() -> str:
-#     return "sql_scripts/db_init.sql"
-
-
-# @pytest.fixture(scope="session")
-# def db_drop_script_path() -> str:
-#     return "sql_scripts/db_drop.sql"
-
-
 @pytest.fixture(scope="session")
 def engine():
     url = get_database_url()
     return create_engine(url, is_echo=True)
-
-
-# @pytest_asyncio.fixture(scope="session", autouse=True)
-# async def prepare_database(
-#     engine: AsyncEngine, db_init_script_path, db_drop_script_path
-# ):
-#     """Создаём таблицы перед тестами и удаляем после."""
-#     async with engine.begin() as conn:
-#         with open(db_init_script_path, "r") as f:
-#             await conn.exec_driver_sql(f.read())
-#     yield
-
-#     async with engine.begin() as conn:
-#         with open(db_drop_script_path, "r") as f:
-#             await conn.exec_driver_sql(f.read())
 
 
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)  # type: ignore

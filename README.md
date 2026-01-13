@@ -6,6 +6,8 @@
 - docker
 - docker-compose
 - uv
+- PostgreSQL
+- MinIO
 
 ### Запуск
 
@@ -16,7 +18,13 @@
    cd distributed_data_storage
    ```
 
-2. Запустить docker-compose.  
+2. Создать .env файл с переменными окружения:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Запустить docker-compose.  
    Таблица логов создается из файла scripts/db/init.sql.  
    Хранилище s3 связывается с папкой data в корне проекта.  
    Адрес s3: http://localhost:9001  
@@ -28,7 +36,7 @@
    docker compose up -d
    ```
 
-3. Основной скрипт. генерация данных в Postgres.  
+4. Основной скрипт. генерация данных в Postgres.  
    Загрузка данных из Postgres в s3 в формате parquet и iceberg:  
 
    ```bash
@@ -40,5 +48,11 @@
 ```
 data/minio/logs-bucket
 ```
-Parquet формат содержит файлы с данными, и мета данные этих файлов.  
-Iceberg формат добавляет к Parquet файлам(data) слой метаданных(metadata) для обеспечения ACID, версионирования, хранения схем таблиц.
+Parquet формат содержит файлы с данными(part.*), и мета данные этих файлов(xl.meta).  
+
+Iceberg формат добавляет к Parquet файлам(data) слой метаданных(metadata) для обеспечения ACID, версионирования, хранения схем таблиц, безопасной конкурентной записи.
+
+Слой metadata Iceberg:
+1. UUID.metadata.json файлы - Метаинформация таблицы, для разных версий таблицы
+2. UUID.avro - манифест файлы, реестр всех файлов Parquet
+3. snap-UUID.avro - Snapshot файлы, снимки состояний таблицы в разное время
