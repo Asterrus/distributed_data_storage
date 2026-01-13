@@ -15,7 +15,27 @@ services:
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  iceberg_catalog_db:
+    image: postgres:18-alpine
+    container_name: iceberg-catalog-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ICEBERG_POSTGRES_DB}
+      POSTGRES_USER: ${ICEBERG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${ICEBERG_POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${ICEBERG_POSTGRES_HOST}
+      POSTGRES_PORT: ${ICEBERG_POSTGRES_PORT}
+    ports:
+      - "5435:5432"
+    volumes:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${ICEBERG_POSTGRES_USER} -d ${ICEBERG_POSTGRES_DB}" ]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -44,9 +64,4 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     entrypoint: >
-      /bin/sh -c "
-      sleep 5;
-      /usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb dockerminio/logs-bucket;
-      exit 0;
-      "
+      /bin/sh -c " sleep 5; /usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb dockerminio/logs-bucket; exit 0; "

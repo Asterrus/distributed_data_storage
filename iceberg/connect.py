@@ -1,3 +1,5 @@
+import os
+
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.schema import NestedField, Schema
 from pyiceberg.types import IntegerType, StringType, TimestamptzType
@@ -12,11 +14,19 @@ schema = Schema(
 
 
 def get_iceberg_catalog(key: str, secret: str):
+    pg_user = os.getenv("ICEBERG_POSTGRES_USER")
+    pg_password = os.getenv("ICEBERG_POSTGRES_PASSWORD")
+    pg_db = os.getenv("ICEBERG_POSTGRES_DB")
+    pg_host = os.getenv("ICEBERG_POSTGRES_HOST")
+    pg_port = os.getenv("ICEBERG_POSTGRES_PORT")
+
+    uri = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
+
     catalog = load_catalog(
         name="local",
         **{
             "type": "sql",
-            "uri": "sqlite:///iceberg_catalog.db",
+            "uri": uri,
             "warehouse": "s3://logs-bucket/iceberg",
             "s3.endpoint": "http://localhost:9000",
             "s3.access-key-id": key,
