@@ -76,6 +76,9 @@ def save_parquet(s3_connection, df: pd.DataFrame):
     logger.info("Данные сохранены в Parquet\n")
 
 def save_iceberg(munio_user: str, minio_password: str, data: pd.DataFrame):
+    """
+    Загружает данные в Iceberg таблицу. Конвертирует типы DataFrame для совместимости с Iceberg.
+    """
     logger.info("🗄️  Создание и загрузка данных в Iceberg таблицу...")
     iceberg_catalog = get_iceberg_catalog(
         munio_user, minio_password
@@ -84,20 +87,13 @@ def save_iceberg(munio_user: str, minio_password: str, data: pd.DataFrame):
     create_iceberg_table(iceberg_catalog, "web_logs")
     
     table = iceberg_catalog.load_table(("default", "web_logs"))
+
+    data["timestamp"] = data["timestamp"].dt.as_unit("us")
+    for col in ["user_id", "response_time", "status_code"]:
+        data[col] = data[col].astype("int32")
+
     arrow_table = pa.Table.from_pandas(data)
     
-    # downcast timestamp
-    arrow_table = arrow_table.set_column(
-        arrow_table.schema.get_field_index("timestamp"),
-        "timestamp",
-        pc.cast(arrow_table["timestamp"], pa.timestamp("us", tz="UTC")),
-    )
-    for col in ["user_id", "response_time", "status_code"]:
-        arrow_table = arrow_table.set_column(
-            arrow_table.schema.get_field_index(col),
-            col,
-            pc.cast(arrow_table[col], pa.int32()),
-        )
     table.append(arrow_table)
     logger.info("Данные загружены в Iceberg\n")
 
@@ -115,7 +111,6 @@ async def main():
     
     # 3. Читаем данные из БД
     data = await load_data_from_db(engine)
-    print(f'{data.tail(10)}')
     
     # 4. Получаем S3 подключение
     s3_connection = get_s3_conn(munio_user, minio_password)
