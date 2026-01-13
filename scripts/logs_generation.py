@@ -70,4 +70,4 @@ def generate_logs(n) -> Generator[dict, None, None]:
 
     for _ in range(n):
         yield generate_log_row(start_datetime, current_datetime)
-    logger.debug(f"Generated {n} logs")
+    logger.info(f"Generated {n} logs")

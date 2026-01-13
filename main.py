@@ -46,14 +46,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def generate_and_write_data_to_db(engine):
+async def generate_and_write_data_to_db(engine):
     logger.info("Генерация и загрузка логов в PostgreSQL...")
-    asyncio.run(insert_logs(engine, list(generate_logs(10000))))
+    await insert_logs(engine, list(generate_logs(10000)))
     logger.info("Логи загружены в PostgreSQL\n")
 
-def load_data_from_db(engine: AsyncEngine) -> pd.DataFrame:
+async def load_data_from_db(engine: AsyncEngine) -> pd.DataFrame:
     logger.info("Чтение логов из PostgreSQL...")
-    data = asyncio.run(read_logs(engine))
+    data = await read_logs(engine)
     logger.info(f"Прочитано {len(data):,} строк\n")
     return data
 
@@ -101,7 +101,7 @@ def save_iceberg(munio_user: str, minio_password: str, data: pd.DataFrame):
     table.append(arrow_table)
     logger.info("Данные загружены в Iceberg\n")
 
-def main():
+async def main():
     logger.info("Начинаем ETL процесс...\n")
 
     munio_user = os.environ["MINIO_ROOT_USER"]
@@ -111,10 +111,11 @@ def main():
     engine = create_engine(get_database_url())
 
     # 2. Генерируем и загружаем данные в БД
-    generate_and_write_data_to_db(engine)
+    await generate_and_write_data_to_db(engine)
     
     # 3. Читаем данные из БД
-    data =load_data_from_db(engine)
+    data = await load_data_from_db(engine)
+    print(f'{data.tail(10)}')
     
     # 4. Получаем S3 подключение
     s3_connection = get_s3_conn(munio_user, minio_password)
@@ -129,4 +130,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
