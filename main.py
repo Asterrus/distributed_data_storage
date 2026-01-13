@@ -98,7 +98,7 @@ def save_iceberg(munio_user: str, minio_password: str, data: pd.DataFrame):
     logger.info("Данные загружены в Iceberg\n")
 
 async def main():
-    logger.info("Начинаем ETL процесс...\n")
+    logger.info("Начало работы скрипта...\n")
 
     munio_user = os.environ["MINIO_ROOT_USER"]
     minio_password = os.environ["MINIO_ROOT_PASSWORD"]
@@ -108,7 +108,8 @@ async def main():
 
     # 2. Генерируем и загружаем данные в БД
     await generate_and_write_data_to_db(engine)
-    
+
+    logger.info("Начинаем ETL процесс...\n")
     # 3. Читаем данные из БД
     data = await load_data_from_db(engine)
     
