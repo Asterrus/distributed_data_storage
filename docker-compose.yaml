@@ -10,15 +10,17 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
     volumes:
-      - /var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
       - ./scripts/db/:/docker-entrypoint-initdb.d
     ports:
-      - "5434:5432"
+      - "${POSTGRES_PORT}:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 5
+    networks:
+      - spark_network
 
   iceberg_catalog_db:
     image: postgres:18-alpine
@@ -31,11 +33,15 @@ services:
       POSTGRES_HOST: ${ICEBERG_POSTGRES_HOST}
       POSTGRES_PORT: ${ICEBERG_POSTGRES_PORT}
     ports:
-      - "5435:5432"
+      - "${ICEBERG_POSTGRES_PORT}:5432"
     volumes:
-      - /var/lib/postgresql/data
+      - iceberg_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${ICEBERG_POSTGRES_USER} -d ${ICEBERG_POSTGRES_DB}" ]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${ICEBERG_POSTGRES_USER} -d ${ICEBERG_POSTGRES_DB}",
+        ]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -53,15 +59,115 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - ./data/minio:/data
+    networks:
+      - spark_network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+        interval: 3s
+        timeout: 3s
+        retries: 5
 
   createbuckets:
     image: minio/mc:latest
     container_name: distributed-data-storage-minio-mc
-    depends_on:
-      - minio
     restart: on-failure
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     entrypoint: >
-      /bin/sh -c " sleep 5; /usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb dockerminio/logs-bucket; exit 0; "
+      /bin/sh -c "/usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb dockerminio/logs-bucket; exit 0; "
+    networks:
+      - spark_network
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  # Spark Master (координатор)
+  spark-master:
+    build:
+      context: ./spark/
+      dockerfile: Dockerfile
+      args:
+        POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
+    container_name: spark_master
+    restart: unless-stopped
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port ${SPARK_MASTER_PORT}
+      --webui-port ${SPARK_MASTER_WEBUI_PORT}
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: ${SPARK_MASTER_PORT}
+      SPARK_MASTER_WEBUI_PORT: ${SPARK_MASTER_WEBUI_PORT}
+
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+
+      POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
+
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${SPARK_MASTER_WEBUI_PORT}:8080"
+      - "${SPARK_MASTER_PORT}:7077"
+    volumes:
+      # - ./data:/opt/spark/data
+      - ./scripts/spark_python:/opt/spark/scripts
+      # - ./spark/conf:/opt/spark/conf
+    networks:
+      - spark_network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Spark Worker (исполнитель задач)
+  spark-worker:
+    build:
+      context: ./spark/
+      dockerfile: Dockerfile
+      args:
+        POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
+    container_name: spark_worker_1
+    restart: unless-stopped
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:${SPARK_MASTER_PORT}
+    environment:
+      SPARK_MASTER_URL: spark://spark-master:${SPARK_MASTER_PORT}
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY}
+
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+
+      POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
+
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${SPARK_WORKER_WEBUI_PORT}:8081"
+    volumes:
+      # - ./data:/opt/spark/data
+      - ./scripts/spark_python:/opt/spark/scripts
+      # - ./spark/conf:/opt/spark/conf
+    networks:
+      - spark_network
+    depends_on:
+      - spark-master
+
+networks:
+  spark_network:
+    driver: bridge
+
+volumes:
+  pg_data:
+  iceberg_pg_data:
