@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 async def generate_and_write_data_to_db(engine):
     logger.info("Генерация и загрузка логов в PostgreSQL...")
-    await insert_logs(engine, list(generate_logs(10000)))
+    await insert_logs(engine, list(generate_logs(100000)))
     logger.info("Логи загружены в PostgreSQL\n")
 
 

@@ -1,8 +1,13 @@
+import logging
 import os
+from time import perf_counter
 
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import current_timestamp
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -18,7 +23,7 @@ POSTGRES_JDBC_VERSION = os.getenv("POSTGRES_JDBC_VERSION")
 
 MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER")
 MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD")
-print(f'{MINIO_ROOT_USER =} {MINIO_ROOT_PASSWORD=}')
+print(f"{MINIO_ROOT_USER =} {MINIO_ROOT_PASSWORD=}")
 assert all(
     [
         DB_HOST,
@@ -31,15 +36,14 @@ assert all(
     ]
 )
 
-# PARQUET_PATH = "data/web_logs.parquet"
 TABLE_NAME = "processed_data"
 JDBC_DRIVER = "org.postgresql.Driver"
 JDBC_JAR = f"jars/postgresql-{POSTGRES_JDBC_VERSION}.jar"
-# S3_PATH = "s3a://logs-bucket/parquet/web_logs"
 S3_PATH = "s3a://logs-bucket/parquet/web_logs/web_logs.parquet"
-# S3_PATH = "s3a://logs-bucket/iceberg/default/web_logs"
+
 
 def main():
+    t1 = perf_counter()
     spark = (
         SparkSession.builder.appName("Parquet2Postgres")
         .master(f"spark://spark-master:{SPARK_MASTER_PORT}")
@@ -52,33 +56,43 @@ def main():
         .getOrCreate()
     )
 
-    print("Spark сессия создана")
+    logger.info("Spark сессия создана")
 
+    t1 = perf_counter()
     df = spark.read.parquet(S3_PATH)
+    t2 = perf_counter()
 
-    print(f"Parquet прочитан: {df.count()} строк")
+    logger.info(f"Parquet прочитан: {df.count()} строк")
+    logger.info(f"Время чтения Parquet: {t2 - t1}")
 
+    t3 = perf_counter()
     df = df.withColumn("processed_at", current_timestamp())
+    t4 = perf_counter()
 
-    print("Добавлена колонка 'processed_at'")
+    logger.info("Добавлена колонка 'processed_at'")
+    logger.info(f"Время добавления колонки: {t4 - t3}")
 
     jdbc_url = f"jdbc:postgresql://db:5432/{DB_NAME}"
+    t5 = perf_counter()
     (
         df.repartition(4)
-          .write
-          .format("jdbc")
-          .option("url", jdbc_url)
-          .option("dbtable", TABLE_NAME)
-          .option("user", DB_USER)
-          .option("password", DB_PASS)
-          .option("driver", JDBC_DRIVER)
-          .option("batchsize", 10000)
-          .option("isolationLevel", "READ_COMMITTED")
-          .mode("append")
-          .save()
+        .write.format("jdbc")
+        .option("url", jdbc_url)
+        .option("dbtable", TABLE_NAME)
+        .option("user", DB_USER)
+        .option("password", DB_PASS)
+        .option("driver", JDBC_DRIVER)
+        .option("batchsize", 10000)
+        .option("isolationLevel", "READ_COMMITTED")
+        .mode("append")
+        .save()
     )
+    t6 = perf_counter()
 
-    print(f"Данные записаны в PostgreSQL таблицу '{TABLE_NAME}'")
+    logger.info(f"Данные записаны в PostgreSQL таблицу '{TABLE_NAME}'")
+    logger.info(f"Время записи в PostgreSQL: {t6 - t5}")
+    logger.info(f"Общее время: {t6 - t1}")
+
     spark.stop()
 
 
