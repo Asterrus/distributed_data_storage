@@ -21,7 +21,7 @@
 
 2. Перейти на ветку big_data_apache_spark
    ```bash
-   git checkout distributed_data_storage
+   git checkout big_data_apache_spark
    ```
 
 3. Создать .env файл с переменными окружения:
