@@ -1,0 +1,21 @@
+Создать топик
+/opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --topic logs_topic \
+  --partitions 1 \
+  --replication-factor 1
+
+Список топиков:
+/opt/kafka/bin/kafka-topics.sh   --bootstrap-server localhost:9092 --list
+
+/opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic logs_topic
+{"user_id":1,"url":"/","status_code":200}
+
+
+/opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic logs_topic \
+  --from-beginning

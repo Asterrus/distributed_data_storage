@@ -71,3 +71,15 @@ def generate_logs(n) -> Generator[dict, None, None]:
     for _ in range(n):
         yield generate_log_row(start_datetime, current_datetime)
     logger.info(f"Generated {n} logs")
+
+
+def generate_logs_with_current_timestamp(n):
+    for _ in range(n):
+        yield {
+            "timestamp": datetime.now(tz=timezone.utc),
+            "user_id": random.randint(1, 1000),
+            "url": generate_random_url(),
+            "response_time": generate_response_time(),
+            "status_code": generate_status_code(),
+        }
+    logger.info(f"Generated {n} logs with current_timestamp")
