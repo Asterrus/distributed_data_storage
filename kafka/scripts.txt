@@ -9,12 +9,13 @@
 Список топиков:
 /opt/kafka/bin/kafka-topics.sh   --bootstrap-server localhost:9092 --list
 
+Публикация в топик
 /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server localhost:9092 \
   --topic logs_topic
 {"user_id":1,"url":"/","status_code":200}
 
-
+Чтение из топика
 /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
   --topic logs_topic \

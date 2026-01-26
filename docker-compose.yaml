@@ -1,5 +1,5 @@
 services:
-  db:
+  postgres:
     image: postgres:18-alpine
     container_name: distributed-data-storage-db
     restart: unless-stopped
@@ -13,7 +13,7 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./scripts/db/:/docker-entrypoint-initdb.d
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_EXTERNAL_PORT}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
@@ -22,65 +22,65 @@ services:
     networks:
       - spark_network
 
-  iceberg_catalog_db:
-    image: postgres:18-alpine
-    container_name: iceberg-catalog-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${ICEBERG_POSTGRES_DB}
-      POSTGRES_USER: ${ICEBERG_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${ICEBERG_POSTGRES_PASSWORD}
-      POSTGRES_HOST: ${ICEBERG_POSTGRES_HOST}
-      POSTGRES_PORT: ${ICEBERG_POSTGRES_PORT}
-    ports:
-      - "${ICEBERG_POSTGRES_PORT}:5432"
-    volumes:
-      - iceberg_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${ICEBERG_POSTGRES_USER} -d ${ICEBERG_POSTGRES_DB}",
-        ]
-      interval: 3s
-      timeout: 3s
-      retries: 5
+  # iceberg_catalog_db:
+  #   image: postgres:18-alpine
+  #   container_name: iceberg-catalog-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: ${ICEBERG_POSTGRES_DB}
+  #     POSTGRES_USER: ${ICEBERG_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${ICEBERG_POSTGRES_PASSWORD}
+  #     POSTGRES_HOST: ${ICEBERG_POSTGRES_HOST}
+  #     POSTGRES_PORT: ${ICEBERG_POSTGRES_PORT}
+  #   ports:
+  #     - "${ICEBERG_POSTGRES_PORT}:5432"
+  #   volumes:
+  #     - iceberg_pg_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "pg_isready -U ${ICEBERG_POSTGRES_USER} -d ${ICEBERG_POSTGRES_DB}",
+  #       ]
+  #     interval: 3s
+  #     timeout: 3s
+  #     retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: distributed-data-storage-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - ./data/minio:/data
-    networks:
-      - spark_network
-    healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
-        interval: 3s
-        timeout: 3s
-        retries: 5
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: distributed-data-storage-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   volumes:
+  #     - ./data/minio:/data
+  #   networks:
+  #     - spark_network
+  #   healthcheck:
+  #       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+  #       interval: 3s
+  #       timeout: 3s
+  #       retries: 5
 
-  createbuckets:
-    image: minio/mc:latest
-    container_name: distributed-data-storage-minio-mc
-    restart: on-failure
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    entrypoint: >
-      /bin/sh -c "/usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb dockerminio/logs-bucket; exit 0; "
-    networks:
-      - spark_network
-    depends_on:
-      minio:
-        condition: service_healthy
+  # createbuckets:
+  #   image: minio/mc:latest
+  #   container_name: distributed-data-storage-minio-mc
+  #   restart: on-failure
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   entrypoint: >
+  #     /bin/sh -c "/usr/bin/mc alias set dockerminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb dockerminio/logs-bucket; exit 0; "
+  #   networks:
+  #     - spark_network
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
 
   # Spark Master (координатор)
   spark-master:
@@ -89,7 +89,7 @@ services:
       dockerfile: Dockerfile
       args:
         POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
-    container_name: spark_master
+    container_name: distributed-data-storage-spark_master
     restart: unless-stopped
     command: >
       /opt/spark/bin/spark-class
@@ -122,7 +122,7 @@ services:
     networks:
       - spark_network
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
 
   # Spark Worker (исполнитель задач)
@@ -132,7 +132,7 @@ services:
       dockerfile: Dockerfile
       args:
         POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
-    container_name: spark_worker_1
+    container_name: distributed-data-storage-spark_worker_1
     restart: unless-stopped
     command: >
       /opt/spark/bin/spark-class
@@ -164,6 +164,116 @@ services:
     depends_on:
       - spark-master
 
+  # kafka:
+  #   image: apache/kafka:latest
+  #   container_name: distributed-data-storage-kafka
+  #   ports:
+  #     - "9092:9092"
+  #     - "29092:29092"
+  #   environment:
+  #     KAFKA_NODE_ID: 1
+  #     KAFKA_PROCESS_ROLES: broker,controller
+  #     # KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+  #     KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+  #     # KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #     KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+  #     KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  #     # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+  #     KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  #     KAFKA_NUM_PARTITIONS: 3
+  #   volumes:
+  #     - kafka_data:/var/lib/kafka/data
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - spark_network
+  #   healthcheck:
+  #     test: ["CMD", "bash", "-c", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
+  #     interval: 3s
+  #     timeout: 3s
+  #     retries: 5
+  kafka:
+    image: apache/kafka:latest
+    container_name: distributed-data-storage-kafka
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - spark_network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  producer:
+    container_name: distributed-data-storage-producer
+    build:
+      context: .
+      dockerfile: ./producer/Dockerfile
+    volumes:
+      - ./state:/state
+    environment:
+      PRODUCER_INTERVAL_SEC: ${PRODUCER_INTERVAL_SEC}
+      PRODUCER_STATE_FILE: ${PRODUCER_STATE_FILE}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - spark_network
+
+  logs_sender:
+    container_name: distributed-data-storage-logs_sender
+    build:
+      context: .
+      dockerfile: ./logs_sender/Dockerfile
+    environment:
+      LOGS_SENDER_BATCH_SIZE: ${LOGS_SENDER_BATCH_SIZE}
+      LOGS_SENDER_INTERVAL_SEC: ${LOGS_SENDER_INTERVAL_SEC}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spark_network
+
 networks:
   spark_network:
     driver: bridge
@@ -171,3 +281,4 @@ networks:
 volumes:
   pg_data:
   iceberg_pg_data:
+  kafka_data:
