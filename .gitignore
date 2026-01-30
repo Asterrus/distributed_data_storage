@@ -3,3 +3,5 @@ __pycache__
 data
 .mypy_cache/
 iceberg_catalog.db
+.vscode
+producer/state

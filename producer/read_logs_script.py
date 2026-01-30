@@ -19,11 +19,5 @@ async def read_recent_logs(engine: AsyncEngine, last_ts: str):
     async with engine.connect() as conn:
         result = await conn.execute(text(q), {"last_ts": last_ts})
         rows = result.fetchall()
-        logs = []
-        for row in rows:
-            d = dict(row._mapping)  # корректный способ получить dict
-            ts = d["timestamp"]
-            if isinstance(ts, datetime):
-                d["timestamp"] = ts.isoformat()
-            logs.append(d)
-    return logs
+
+    return [dict(row._mapping) for row in rows]

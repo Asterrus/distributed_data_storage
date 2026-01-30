@@ -5,3 +5,13 @@ CREATE TABLE web_logs (
   status_code INTEGER not null,
   timestamp timestamptz not null
 );
+
+CREATE TABLE processed_data (
+  event_id UUID not null UNIQUE,
+  user_id INTEGER not null,
+  url TEXT not null,
+  response_time INTEGER not null,
+  status_code INTEGER not null,
+  timestamp timestamptz not null,
+  processed_at timestamptz not null
+);

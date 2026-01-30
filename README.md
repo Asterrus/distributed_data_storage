@@ -1,5 +1,5 @@
 ### Описание
-Работа с s3 хранилищем.Postgres -> S3 -> Postgres.  
+Работа с Kafka. Стриминг данных в/из топика Kafka. Postgres -> Kafka -> Postgres.  
 
 ### Инструменты
 
@@ -7,7 +7,6 @@
 - docker-compose
 - uv
 - PostgreSQL
-- MinIO
 - Apache Spark
 
 ### Запуск
@@ -19,9 +18,9 @@
    cd distributed_data_storage
    ```
 
-2. Перейти на ветку big_data_apache_spark
+2. Перейти на ветку kafka_streaming
    ```bash
-   git checkout big_data_apache_spark
+   git checkout kafka_streaming
    ```
 
 3. Создать .env файл с переменными окружения:
@@ -31,14 +30,6 @@
    ```
 
 4. Запустить docker-compose.  
-   Таблица логов создается из файла scripts/db/init.sql.  
-   Хранилище s3 связывается с папкой data в корне проекта.  
-   Адрес s3: http://localhost:9001  
-   Логин: minio Пароль: minio123.  
-   Есть в .env.example(MINIO_ROOT_USER и MINIO_ROOT_PASSWORD). 
-   Создается bucket "logs-bucket".  
-
-   Поднимается Apache Spark(Мастер+Воркер)
    ```bash
    make up
    ```
@@ -47,30 +38,36 @@
    docker compose up -d
    ```
 
-5. Генерация данных в Postgres.  
-   Загрузка данных из Postgres в s3 в формате parquet и iceberg:  
+Сервис logs_sender генерирует и записывает логи в таблицу web_logs PostgreSQL с определенным интервалом.
+LOGS_SENDER_BATCH_SIZE - Сколько логов генерируется
+LOGS_SENDER_INTERVAL_SEC - Как часто
 
+Сервис producer отправляет новые логи в топик KAFKA_TOPIC_NAME,
+новые логи определяются по timestamp последнего забранного лога.
+Топик создается автоматически.
+PRODUCER_INTERVAL_SEC - Как часто проверять наличие новых логов
+
+Сервис spark-consumer проверяет топик KAFKA_TOPIC_NAME на наличие логов
+ и записывает их в в таблицу processed_data PostgreSQL с добавлением колонки processed_at
+
+Проверка работы:
+1) Топик Kafka:  
+http://localhost:8080/ui/clusters/local-kafka/all-topics/logs_topic/messages?mode=TAILING&limit=100&r=r
+где KAFKA_TOPIC_NAME - logs_topic
+
+2) Заполнение web_logs
    ```bash
-   uv run main.py
-   ```
-
-6. Выполнение скрипта python, S3 -> PostgreSQL, через spark-submit Мастер-контейнера Spark:  
-
-   ```bash
-   make run
+   make watch_web_logs
    ```
    или
    ```bash
-   docker compose exec spark-master /opt/spark/bin/spark-submit --master spark://spark-master:7077 /opt/spark/scripts/python_task.py
+   	watch -n 1 "docker compose exec postgres psql -U postgres -d mydb -c \"SELECT count(*) FROM web_logs;\""
    ```
-
-7. Выполнение скрипта python, S3 -> PostgreSQL, через Polars(Без параллельной записи в БД):  
+3) Заполнение processed_data
    ```bash
-   uv run s3_to_postgres.py
+   make watch_processed_data
    ```
-
-Выводы:
-Pyspark позволяет задать количество партиций, размер батчей, берёт на себя параллельную и распределённую обработку данных, позволяет писать более декларативный код.
-На Python пришлось бы самим реализовывать обработку на разных процессах, синхронизировать всё между собой.
-Spark тяжелый, много зависимостей, требует настройки инфраструктуры.
-Для небольших объемов данных - Python. Для больших - Spark.
+   или
+   ```bash
+   	watch -n 1 "docker compose exec postgres psql -U postgres -d mydb -c \"SELECT count(*) FROM processed_data;\""
+   ```
