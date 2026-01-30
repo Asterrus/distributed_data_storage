@@ -16,12 +16,9 @@ run:
 		--master spark://$(SPARK_MASTER):7077 \
 		$(JOB)
 
-.PHONY: watch_web_logs watch_processed_data
-watch_web_logs:
-	watch -n 1 "docker compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c \"SELECT count(*) FROM web_logs;\""
-
-watch_processed_data:
-	watch -n 1 "docker compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c \"SELECT count(*) FROM processed_data;\""
+.PHONY: watch_tables
+watch_tables:
+	watch -n 1 'docker compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT '\''web_logs'\'', count(*) FROM web_logs UNION ALL SELECT '\''processed_data'\'', count(*) FROM processed_data;"'
 
 .PHONY:  open_postgres
 open_postgres:

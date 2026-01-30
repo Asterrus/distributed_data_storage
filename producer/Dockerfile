@@ -1,14 +1,4 @@
-FROM python:3.13-alpine AS builder
-
-RUN apk add --no-cache --virtual .build-deps \
-    build-base \
-    postgresql-dev \
-    python3-dev \
-    musl-dev \
-    gcc \
-    libc-dev \
-    linux-headers \
-    zlib-dev
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
@@ -26,9 +16,7 @@ COPY producer /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 
-RUN apk del .build-deps
-
-FROM python:3.13-alpine
+FROM python:3.13-slim
 
 WORKDIR /app
 COPY --from=builder /app /app

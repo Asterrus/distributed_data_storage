@@ -38,13 +38,13 @@
    docker compose up -d
    ```
 
-Сервис logs_sender генерирует и записывает логи в таблицу web_logs PostgreSQL с определенным интервалом.
-LOGS_SENDER_BATCH_SIZE - Сколько логов генерируется
+Сервис logs_sender генерирует и записывает логи в таблицу web_logs PostgreSQL с определенным интервалом.  
+LOGS_SENDER_BATCH_SIZE - Сколько логов генерируется  
 LOGS_SENDER_INTERVAL_SEC - Как часто
 
 Сервис producer отправляет новые логи в топик KAFKA_TOPIC_NAME,
-новые логи определяются по timestamp последнего забранного лога.
-Топик создается автоматически.
+новые логи определяются по timestamp последнего забранного лога.  
+Топик создается автоматически.  
 PRODUCER_INTERVAL_SEC - Как часто проверять наличие новых логов
 
 Сервис spark-consumer проверяет топик KAFKA_TOPIC_NAME на наличие логов
@@ -53,21 +53,13 @@ PRODUCER_INTERVAL_SEC - Как часто проверять наличие но
 Проверка работы:
 1) Топик Kafka:  
 http://localhost:8080/ui/clusters/local-kafka/all-topics/logs_topic/messages?mode=TAILING&limit=100&r=r
-где KAFKA_TOPIC_NAME - logs_topic
+где logs_topic это KAFKA_TOPIC_NAME
 
-2) Заполнение web_logs
+2) Заполнение таблиц web_logs и processed_data
    ```bash
-   make watch_web_logs
+   make watch_tables
    ```
    или
    ```bash
-   	watch -n 1 "docker compose exec postgres psql -U postgres -d mydb -c \"SELECT count(*) FROM web_logs;\""
-   ```
-3) Заполнение processed_data
-   ```bash
-   make watch_processed_data
-   ```
-   или
-   ```bash
-   	watch -n 1 "docker compose exec postgres psql -U postgres -d mydb -c \"SELECT count(*) FROM processed_data;\""
+   watch -n 1 'docker compose exec postgres psql -U postgres -d mydb -c "SELECT '\''web_logs'\'', count(*) FROM web_logs UNION ALL SELECT '\''processed_data'\'', count(*) FROM processed_data;"'
    ```
