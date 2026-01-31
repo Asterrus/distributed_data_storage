@@ -4,16 +4,15 @@ export
 SPARK_MASTER := spark-master
 JOB := /opt/spark/scripts/kafka_to_postgres.py
 
-.PHONY: up down run stop
+.PHONY: up up_dev down run stop
 up:
 	docker compose up -d --build
-
+up_dev:
+	docker compose --profile dev up -d --build
 down:
 	docker compose down --volumes --remove-orphans
-
 stop:
 	docker compose stop
-
 run:
 	docker compose exec $(SPARK_MASTER) /opt/spark/bin/spark-submit \
 		--master spark://$(SPARK_MASTER):7077 \

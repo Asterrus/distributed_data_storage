@@ -206,6 +206,7 @@ services:
 
   kafka-ui:
     image: ghcr.io/kafbat/kafka-ui
+    profiles: ["dev"]
     container_name: distributed-data-storage-kafka-ui
     ports:
       - "8080:8080"

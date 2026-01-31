@@ -8,6 +8,7 @@
 - docker-compose
 - uv
 - PostgreSQL
+- Kafka
 - Apache Spark
 
 ### Запуск
@@ -53,7 +54,10 @@ PRODUCER_INTERVAL_SEC - Как часто проверять наличие но
 
 Проверка работы:
 1) Топик Kafka:  
-http://localhost:8080/ui/clusters/local-kafka/all-topics/logs_topic/messages?mode=TAILING&limit=100&r=r
+Запуск Kafka-UI:  
+docker compose up kafka-ui -d  
+Просмотр загрузки логов в топик:  
+http://localhost:8080/ui/clusters/local-kafka/all-topics/logs_topic/messages?mode=TAILING&limit=100&r=r  
 где logs_topic это KAFKA_TOPIC_NAME
 
 2) Заполнение таблиц web_logs и processed_data
