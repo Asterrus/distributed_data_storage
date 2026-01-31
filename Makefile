@@ -2,14 +2,17 @@ include .env
 export
 
 SPARK_MASTER := spark-master
-JOB := /opt/spark/scripts/python_task.py
+JOB := /opt/spark/scripts/kafka_to_postgres.py
 
-.PHONY: up down run 
+.PHONY: up down run stop
 up:
 	docker compose up -d --build
 
 down:
 	docker compose down --volumes --remove-orphans
+
+stop:
+	docker compose stop
 
 run:
 	docker compose exec $(SPARK_MASTER) /opt/spark/bin/spark-submit \

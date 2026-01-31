@@ -15,7 +15,7 @@ services:
     ports:
       - "${POSTGRES_EXTERNAL_PORT}:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -47,7 +47,7 @@ services:
       POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
       KAFKA_TOPIC_NAME: ${KAFKA_TOPIC_NAME}
     ports:
-      - "${SPARK_MASTER_WEBUI_PORT}:8080"
+      - "${SPARK_MASTER_WEBUI_PORT}:8082"
       - "${SPARK_MASTER_PORT}:7077"
     volumes:
       - ./scripts/spark_python:/opt/spark/scripts
@@ -90,6 +90,7 @@ services:
     depends_on:
       - spark-master
 
+  # Spark Driver (координатор)
   spark-consumer:
     build:
       context: ./spark/
@@ -110,8 +111,11 @@ services:
 
       POSTGRES_JDBC_VERSION: ${POSTGRES_JDBC_VERSION}
       KAFKA_TOPIC_NAME: ${KAFKA_TOPIC_NAME}
+    ports:
+      - "4040:4040"
     volumes:
       - ./scripts/spark_python:/opt/spark/scripts
+      - spark_checkpoint:/opt/spark/checkpoints
     depends_on:
       kafka:
         condition: service_healthy
@@ -148,7 +152,13 @@ services:
     networks:
       - spark_network
     healthcheck:
-      test: [ "CMD", "bash", "-c", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1" ]
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1",
+        ]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -217,3 +227,4 @@ volumes:
   iceberg_pg_data:
   kafka_data:
   kafka_ui_data:
+  spark_checkpoint:

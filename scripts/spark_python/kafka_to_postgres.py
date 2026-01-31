@@ -5,6 +5,7 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql.functions import (
     col,
     current_timestamp,
@@ -33,7 +34,6 @@ schema = ArrayType(
             StructField("url", StringType()),
             StructField("response_time", IntegerType()),
             StructField("status_code", IntegerType()),
-            StructField("event_id", StringType()),
         ]
     )
 )
@@ -88,7 +88,7 @@ def write_to_postgres(batch_df: DataFrame, batch_id: int):
             cur,
             """
             INSERT INTO processed_data (
-                event_id, user_id, url, response_time, 
+                event_id, user_id, url, response_time,
                 status_code, timestamp, processed_at
             ) VALUES %s
             ON CONFLICT (event_id) DO NOTHING
@@ -114,6 +114,7 @@ def main():
         SparkSession.builder.appName("Kafka2Postgres")
         .master(f"spark://spark-master:{SPARK_MASTER_PORT}")
         .config("spark.jars", JDBC_JAR)
+        .config("spark.sql.streaming.ui.enabled", "true")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
@@ -136,10 +137,23 @@ def main():
         .select("row.*")
         .withColumn("timestamp", to_timestamp(col("timestamp")))
         .withColumn("processed_at", current_timestamp())
+        .withColumn(
+            "event_id",
+            F.sha1(
+                F.concat_ws(
+                    "|",
+                    F.col("user_id"),
+                    F.col("url"),
+                    F.col("response_time").cast("string"),
+                    F.col("status_code").cast("string"),
+                    F.col("timestamp").cast("string"),
+                )
+            ),
+        )
     )
 
     parsed_df.writeStream.foreachBatch(write_to_postgres).option(
-        "checkpointLocation", "/tmp/checkpoints/kafka_to_pg"
+        "checkpointLocation", "/opt/spark/checkpoints/kafka_to_pg"
     ).outputMode("append").start()
 
     logger.info("Spark stream started")

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import uuid
 from datetime import datetime
 
 from db_connection import create_engine, get_database_url
@@ -28,32 +27,16 @@ async def publish_logs(logs: list[dict]) -> bool:
     """Публикация логов в Kafka"""
     logger.info(f"Публикация {len(logs)} логов в {KAFKA_TOPIC_NAME} топике Kafka")
     try:
-        await broker.publish(
-            logs,
-            topic=KAFKA_TOPIC_NAME,
-        )
+        for log in logs:
+            await broker.publish(
+                log,
+                topic=KAFKA_TOPIC_NAME,
+            )
+
         return True
     except Exception as e:
         logger.error(f"Ошибка при публикации логов в Kafka: {e}")
         return False
-
-
-def normalize_ts(ts):
-    """Нормализуем timestamp для корректного создания uuid"""
-    return datetime.fromisoformat(ts).isoformat()
-
-
-def generate_event_id(log: dict) -> str:
-    """Генерируем уникальный id на основе данных лога"""
-    canonical = (
-        f"user_id:{log['user_id']}"
-        f"|url:{log['url']}"
-        f"|response_time:{log['response_time']}"
-        f"|status_code:{log['status_code']}"
-        f"|timestamp:{normalize_ts(log['timestamp'])}"
-    )
-
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, canonical))
 
 
 def validate_logs(logs: list[dict]) -> list[dict]:
@@ -62,7 +45,6 @@ def validate_logs(logs: list[dict]) -> list[dict]:
         ts = log["timestamp"]
         if isinstance(ts, datetime):
             log["timestamp"] = ts.isoformat()
-        log["event_id"] = generate_event_id(log)
     return logs
 
 

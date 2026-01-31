@@ -7,7 +7,7 @@ CREATE TABLE web_logs (
 );
 
 CREATE TABLE processed_data (
-  event_id UUID not null UNIQUE,
+  event_id TEXT not null UNIQUE,
   user_id INTEGER not null,
   url TEXT not null,
   response_time INTEGER not null,
